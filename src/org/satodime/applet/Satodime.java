@@ -294,6 +294,9 @@ public class Satodime extends javacard.framework.Applet {
 
     /* For the setup function - should only be called once */
     private boolean setupDone = false;
+
+    // Multi-Step Install variables
+    private short install_step = 0;
     
     // shared cryptographic objects
     private RandomData randomData;
@@ -455,31 +458,36 @@ public class Satodime extends javacard.framework.Applet {
         // secure channel
         sc_sessionkey= (AESKey) KeyBuilder.buildKey(KeyBuilder.TYPE_AES, KeyBuilder.LENGTH_AES_128, false); // todo: make transient?
         sc_ephemeralkey= (ECPrivateKey) KeyBuilder.buildKey(KeyBuilder.TYPE_EC_FP_PRIVATE, LENGTH_EC_FP_256, false);
-        sc_aes128_cbc= Cipher.getInstance(Cipher.ALG_AES_BLOCK_128_CBC_NOPAD, false); 
-                
+        sc_aes128_cbc= Cipher.getInstance(Cipher.ALG_AES_BLOCK_128_CBC_NOPAD, false);
+
+        install_step = 1;
+        
+    } // end of constructor
+
+    private boolean complete_install() {
         // perso PKI: generate public/private keypair
         authentikey_private= (ECPrivateKey) KeyBuilder.buildKey(KeyBuilder.TYPE_EC_FP_PRIVATE, LENGTH_EC_FP_256, false);
         Secp256k1.setCommonCurveParameters(authentikey_private);
-        authentikey_public= (ECPublicKey) KeyBuilder.buildKey(KeyBuilder.TYPE_EC_FP_PUBLIC, LENGTH_EC_FP_256, false); 
+        authentikey_public= (ECPublicKey) KeyBuilder.buildKey(KeyBuilder.TYPE_EC_FP_PUBLIC, LENGTH_EC_FP_256, false);
         Secp256k1.setCommonCurveParameters(authentikey_public);
         //authentikey_pair= new KeyPair(authentikey_public, authentikey_private);
         //authentikey_pair.genKeyPair(); //=> cap file fails to load!
         randomData.generateData(recvBuffer, (short)0, SIZE_ECPRIVKEY);
         authentikey_private.setS(recvBuffer, (short)0, SIZE_ECPRIVKEY); //random value first
-        keyAgreement.init(authentikey_private);   
+        keyAgreement.init(authentikey_private);
         keyAgreement.generateSecret(Secp256k1.SECP256K1, Secp256k1.OFFSET_SECP256K1_G, (short) 65, recvBuffer, (short)0); //pubkey in uncompressed form => silently fail after cap loaded
         authentikey_public.setW(recvBuffer, (short)0, (short)65);
-        
+
         // private & public key arrays
         ecprivkeys = new ECPrivateKey[MAX_NUM_KEYS];
         for (byte key_nbr=(byte)0; key_nbr<MAX_NUM_KEYS; key_nbr++){
             ecprivkeys[key_nbr] = (ECPrivateKey) KeyBuilder.buildKey(KeyBuilder.TYPE_EC_FP_PRIVATE, LENGTH_EC_FP_256, false);
             Secp256k1.setCommonCurveParameters(ecprivkeys[key_nbr]);
         }
-        ecpubkeys = new byte[(short)(MAX_NUM_KEYS*SIZE_ECPUBKEY)]; //new ECPublicKey[MAX_NUM_KEYS]; 
+        ecpubkeys = new byte[(short)(MAX_NUM_KEYS*SIZE_ECPUBKEY)]; //new ECPublicKey[MAX_NUM_KEYS];
         user_entropy_array = new byte[(short)(MAX_NUM_KEYS*SIZE_ENTROPY)];
         card_entropy_array = new byte[(short)(MAX_NUM_KEYS*SIZE_ENTROPY)];
-        
+
         // key metadata
         state_array= new byte[MAX_NUM_KEYS];
         type_array= new byte[MAX_NUM_KEYS];
@@ -489,21 +497,24 @@ public class Satodime extends javacard.framework.Applet {
         tokenid_array= new byte[(short)MAX_NUM_KEYS*SIZE_TOKENID];
         data_array= new byte[(short)MAX_NUM_KEYS*SIZE_DATA];
         //unlock_code_array= new byte[(short)MAX_NUM_KEYS*SIZE_UNLOCK_CODE];
-        
+
         // unlock data
         unlock_secret= new byte[SIZE_UNLOCK_SECRET];
         unlock_counter= new byte[SIZE_UNLOCK_COUNTER];
         //Util.arrayFillNonAtomic(unlock_counter, (short)0, SIZE_UNLOCK_COUNTER, (byte)0); //todo: use a random initial value?
         randomData.generateData(unlock_counter, (short)0, SIZE_UNLOCK_COUNTER);
         randomData.generateData(unlock_secret, (short)0, SIZE_UNLOCK_SECRET);
-        
+
         // set keys state to uninitialized
         Util.arrayFillNonAtomic(state_array, (short)0, MAX_NUM_KEYS, STATE_UNINITIALIZED);
-        
+
         // card label
-        card_label = new byte[MAX_CARD_LABEL_SIZE];  
-        
-    } // end of constructor
+        card_label = new byte[MAX_CARD_LABEL_SIZE];
+
+        install_step = 2;
+        return true;
+
+    }
 
     public boolean select() {
         /*
@@ -512,6 +523,10 @@ public class Satodime extends javacard.framework.Applet {
         
         //todo: clear secure channel values?
         initialized_secure_channel=false;
+
+        if (install_step < 2) {
+            complete_install();
+        }
         
         return true;
     }

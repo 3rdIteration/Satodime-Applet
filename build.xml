@@ -8,6 +8,8 @@
 	<!--
     You could add descriptions of overridable targets here, or just link to online help...
     -->
+	<get src="https://github.com/martinpaljak/ant-javacard/releases/latest/download/ant-javacard.jar" dest="./lib/" skipexisting="true"/>
+
 	<taskdef name="javacard" classname="pro.javacard.ant.JavaCard" classpath="lib/ant-javacard.jar"/>
 	
 	<target name="build">
@@ -19,9 +21,17 @@
 		  </cap>
 		</javacard>
 		-->
-		
+		<mkdir dir="build"/>
+		<!-- Build for Javacard 3.0.4 (J3H145, etc)-->
 		<javacard>
-		  <cap jckit="C:\Dev\jc304_kit" aid="5361746f44696d65" version="0.1" output="Satodime-3.0.4.cap" sources="src\org\satodime\applet">
+		  <cap jckit=".\sdks\jc304_kit" aid="5361746f44696d65" version="0.1" output="build\Satodime-3.0.4.cap" sources="src\org\satodime\applet">
+			<applet class="org.satodime.applet.Satodime" aid="5361746f44696d6500"/>
+		  </cap>
+		</javacard>
+
+		<!-- Build for Javacard 3.0.5 (J3R180, THD-89, etc)-->
+		<javacard>
+		  <cap jckit=".\sdks\jc305u4_kit" aid="5361746f44696d65" version="0.1" output="build\Satodime-3.0.5.cap" sources="src\org\satodime\applet">
 			<applet class="org.satodime.applet.Satodime" aid="5361746f44696d6500"/>
 		  </cap>
 		</javacard>
